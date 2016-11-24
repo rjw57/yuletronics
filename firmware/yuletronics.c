@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
@@ -60,26 +61,63 @@ static void wait(void)
 
 int main(void)
 {
+    int brightneses[8];
+    int velocities[8];
+    int accels[8];
+
     gpio_setup();
 
+    for(int i=0; i<8; ++i) {
+        brightneses[i] = 0;
+        velocities[i] = 0;
+        accels[i] = 0;
+    }
+
+    uint32_t tick;
     while(true)
     {
-        TURNON(1);
-        TURNON(5);
-        wait();
-        TURNON(3);
-        TURNON(7);
-        wait();
-        TURNOFF(1);
-        TURNOFF(5);
-        wait();
-        TURNOFF(3);
-        TURNOFF(7);
-        TURNON(2);
-        TURNON(8);
-        wait();
-        TURNOFF(2);
-        TURNOFF(8);
+        ++tick;
+
+        for(int i=0; i<256; ++i) {
+            for(int j=0; j<8; ++j) {
+                if((brightneses[j]>>8) > i) {
+                    TURNON(j+1);
+                } else {
+                    TURNOFF(j+1);
+                }
+            }
+        }
+
+        for(int i=0; i<8; ++i) {
+            int delta = 40000 - brightneses[i];
+            int scaling = rand() & 0xff;
+            if(delta > 0) {
+                accels[i] = (scaling * delta) >> 14;
+            } else {
+                accels[i] = -((scaling * (-delta)) >> 14);
+            }
+        }
+
+        for(int i=0; i<8; ++i) {
+            int x = velocities[i] + accels[i];
+            if(rand() & 1) {
+                x += rand() & 0xff;
+            } else {
+                x -= rand() & 0xff;
+            }
+            velocities[i] = x;
+        }
+
+        for(int i=0; i<8; ++i) {
+            int y = brightneses[i] + velocities[i];
+            if(y < 1000) {
+                y = 1000;
+            }
+            if(y > 64535) {
+                y = 64535;
+            }
+            brightneses[i] = y;
+        }
     }
     return 0;
 }
